@@ -47,87 +47,40 @@ def month_summary():
 
 
 def get_categories():
-
-    # TODO make a function witht this query to get the total paid on expenses.
-    #test_query = """SELECT
-    #    category,
-    #    SUM(CASE
-    #        WHEN transaction_type = 'expense' THEN amount
-    #        WHEN transaction_type = 'income' THEN -amount
-    #        ELSE 0
-    #    END) AS net_amount
-    #FROM
-    #    transactions
-    #GROUP BY
-    #    category
-    #HAVING
-    #    net_amount >= 0
-    #ORDER BY
-    #    net_amount DESC;"""
-
-    #user_in = ""
-
     connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
 
-    query = "SELECT * FROM categories"
-    cursor.execute(query)
-    categories = cursor.fetchall()
+    query = "SELECT * FROM categories ORDER BY category_name ASC"
+    
     return pd.read_sql_query(query, connection)
+
     
-    #if len(categories) == 0:
-    #    print("No Cateories, please add")
-    #else:
-    #    print("current categories:")
-    #    for category in categories:
-    #        print(f"ID: {category[0]}, Name: {category[1]}")
-    
-    #print("\n")
-
-#SELECT
-#    SUM(CASE
-#        WHEN transaction_type = 'expense' THEN amount
-#        WHEN transaction_type = 'income' THEN -amount
-#        ELSE 0
-#    END) AS net_amount
-#FROM
-#    transactions
-#GROUP BY
-#    category
-#-- Filter the groups: only include categories where the net_amount is zero or positive
-#HAVING
-#    net_amount >= 0
-#ORDER BY
-#    net_amount DESC;
-    while user_in.upper() != "Q":
-        user_in = input("Please enter a category to add, or Q to quit: ")
-        if user_in.upper() == "Q":
-            break
-        user_in = user_in.capitalize()
-
-        query = f"SELECT 1 FROM categories WHERE category_name = '{user_in}'"
-        cursor.execute(query)
-        if cursor.fetchone():
-            print(f"{user_in} already in Database")
-        else:
-            query = f"INSERT into categories (category_name) VALUES ('{user_in}')"
-            cursor.execute(query)
-            connection.commit()
-
-
-    connection.close()
-    
-def update_category(change_df):
+def update_categories(change_list):
     connection = sqlite3.connect(DATABASE)
-    cursor.connection.cursor()
+    cursor = connection.cursor()
 
-    for _, row in change_df.iterrows():
-        cursor.execute("""
+    result = ""
+
+    query = """
             UPDATE transaction_split
             SET category_id = ?
             WHERE split_id = ?
         """
-        )
+    try:
+
+        cursor.executemany(query, change_list)
+
+        connection.commit()
+
+        result = f"Successfully updated {cursor.rowcount} rows!"
+
+    except sqlite3.Error as e:
+        result = f"A database error occured: {e}"
+        connection.rollback()
+    
+    finally:
+        connection.close()
+        return result
 
 def categorize_transactions(db):
     user_in = ""

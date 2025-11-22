@@ -17,10 +17,20 @@ def initialize_session_state():
     if 'editor_key' not in st.session_state:
         st.session_state.editor_key = 0
 
+    if 'edited_df' not in st.session_state:
+        st.session_state.edited_df = pd.DataFrame()
+
 def reset_dataframe():
     st.session_state.current_df = st.session_state.original_df.copy()
     st.session_state.editor_key += 1
     st.toast("Successfully reset category edits!")
+
+def submit_changes(changed_list):
+    st.toast(update_categories(changed_list))
+    del st.session_state.original_df
+    del st.session_state.current_df
+    del st.session_state.editor_key
+    del st.session_state.edited_df
 
 
 
@@ -41,11 +51,11 @@ def main():
     with tab1:
         st.title("My Budget")
         
+        filtered_df = st.session_state.original_df.copy()
 
         my_list = categories["category_name"].tolist()
 
         my_list.insert(0, "")
-        #print(my_list)
         
         col1, col2, col3 = st.columns(3)
         #search for descriptions
@@ -58,7 +68,7 @@ def main():
         if description_search:
             search_term = description_search.lower()
 
-            st.session_state.current_df = st.session_state.current_df[st.session_state.current_df['description'].str.lower().str.contains(search_term, na=False)]
+            filtered_df = filtered_df[filtered_df['description'].str.lower().str.contains(search_term, na=False)]
         #else:
             
             #filtered_df = df.copy()
@@ -67,16 +77,16 @@ def main():
         transaction_type_search = col2.selectbox("Select Transaction Type", ("", "Income", "Expense"))
 
         if transaction_type_search:
-            st.session_state.current_df = st.session_state.current_df[st.session_state.current_df["transaction_type_name"].str.contains(transaction_type_search)]
+            filtered_df = filtered_df[filtered_df["transaction_type_name"].str.contains(transaction_type_search)]
 
         #search for categories
         category_search = col3.selectbox("Select Category", my_list)
 
         if category_search:
-            st.session_state.current_df = st.session_state.current_df[st.session_state.current_df["category_name"].str.contains(category_search)]
+            filtered_df = filtered_df[filtered_df["category_name"].str.contains(category_search)]
 
-        edited_df = st.data_editor(
-            st.session_state.current_df,
+        st.session_state.edited_df = st.data_editor(
+            filtered_df,
             #key="editor",
             key=f"data_editor_{st.session_state.editor_key}",
             column_order=["description", "transaction_date", "amount", "transaction_type_name", "category_name"],
@@ -84,8 +94,13 @@ def main():
                 "description": "Description",
                 "transaction_date": st.column_config.DateColumn(
                     "Transaction Date",
-                    format="MM/DD/YYY",
+                    format="MM/DD/YYYY",
                 ), 
+                "amount": st.column_config.NumberColumn(
+                    "Amount",
+                    format="dollar",
+                ),
+                "transaction_type_name": "Transaction Type",
                 "category_name": st.column_config.SelectboxColumn(
                     "Category",
                     options=my_list
@@ -94,8 +109,6 @@ def main():
             hide_index=True
         )
 
-        if not edited_df.equals(st.session_state.current_df):
-            st.session_state.current_df = edited_df
 
         editor_state = st.session_state.get(f"data_editor_{st.session_state.editor_key}", {})
 
@@ -103,8 +116,8 @@ def main():
 
         changed_list = []
         for row_idx, changes in edited_rows.items():
-            split_id = st.session_state.original_df.loc[row_idx, "split_id"]
-            description = st.session_state.original_df.loc[row_idx, "description"]
+            split_id = int(st.session_state.edited_df.iloc[row_idx]["split_id"])
+            description = st.session_state.edited_df.iloc[row_idx]["description"]
 
             if "category_name" in changes:
                 new_category_name = changes["category_name"]
@@ -117,15 +130,28 @@ def main():
                     "new_category_id": new_category_id
                 })
 
+
+
+        update_list = []
         changed_df = pd.DataFrame(changed_list)
         if not changed_df.empty:
             
-            st.button('Reset', on_click=reset_dataframe)
+            for i in changed_list:
+                update_list.append((i["new_category_id"], int(i["split_id"])))
+             
+            st.button('Reset', on_click=reset_dataframe, type="primary")
+            st.button('Submit', on_click=submit_changes, args=[update_list])
 
 
             st.dataframe(changed_df,
                         column_order=["description", "new_category_name"],
+                        column_config={
+                         "description": "Description",
+                         "new_category_name": "New Category"
+
+                         },
                         hide_index=True)
+
 
 
     with tab2:
