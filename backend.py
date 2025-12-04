@@ -24,6 +24,24 @@ def get_transactions():
     connection.close()
     return df
 
+def get_monthly_category_summary():
+    connection = sqlite3.connect(DATABASE)
+
+    query = """SELECT strftime('%Y-%m', t.transaction_date) AS year_month, c.category_id, c.category_name, SUM(ts.amount) AS total FROM
+        categories AS c
+        LEFT JOIN transaction_split AS ts
+        ON c.category_id = ts.category_id
+        LEFT JOIN transactions as t
+        ON ts.transaction_id = t.transaction_id
+        WHERE c.is_visable = 'True'
+        GROUP BY c.category_id, c.category_name, year_month
+        ORDER BY year_month
+        """
+
+    df = pd.read_sql_query(query, connection)
+    connection.close()
+    return df
+
 
 def month_summary():
     connection = sqlite3.connect(DATABASE)
@@ -53,6 +71,24 @@ def get_categories():
     query = "SELECT * FROM categories ORDER BY category_name ASC"
     
     return pd.read_sql_query(query, connection)
+
+def add_category(category_name, parent_category, is_visable):
+    connection = sqlite3.connect(DATABASE)
+    cursor = connection.cursor()
+
+    cursor.execute("SELECT * FROM categories WHERE category_name = ?", (category_name,))
+    
+    #print(cursor.fetchone())
+    try:
+        if cursor.fetchone() is None:
+            cursor.execute("INSERT INTO categories (category_name, parent_category_id, is_visable) VALUES (?, ?, ?)", (category_name, parent_category, is_visable,))
+            connection.commit()
+            connection.close()
+            return "Added Category Successfully"
+        else:
+            return "Category already in database"
+    except Exception as e:
+        return e
 
     
 def update_categories(change_list):
