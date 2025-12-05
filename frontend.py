@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import datetime
 from backend import *
 import plotly.express as px
 import plotly.graph_objects as go
@@ -64,7 +65,7 @@ def main():
 
         category_list.insert(0, "")
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         #search for descriptions
         description_search = col1.text_input(
             label="Search for transaction desctription",
@@ -91,6 +92,15 @@ def main():
 
         if category_search:
             filtered_df = filtered_df[filtered_df["category_name"].str.contains(category_search)]
+
+        date_search_start, date_search_end = col4.date_input(
+            "Select Dates",
+            (datetime.date(2024, 1, 1), datetime.date.today()),
+            datetime.date(2024, 1, 1), datetime.date.today(),
+            format="MM/DD/YYYY"
+        )
+        if date_search_start and date_search_end:
+            filtered_df = filtered_df[filtered_df['transaction_date'].between(date_search_start, date_search_end)]
 
         st.session_state.edited_df = st.data_editor(
             filtered_df,
