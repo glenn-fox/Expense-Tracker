@@ -39,24 +39,27 @@ def submit_category(category_name, parent_category, is_visable):
         parent_category = None 
     st.toast(add_category(category_name, parent_category, is_visable))
 
+def submit_CSV_import(df, account_id):
+    st.toast(import_file_to_db(df, account_id))
+    
 
 def main():
 
     st.set_page_config(page_title="My Budget", layout="wide")
 
     st.title("My Budget")
-
+    sync_transactions()
 
     initialize_session_state()
 
     #df = get_transactions()
 
     #df["transaction_date"] = pd.to_datetime(df["transaction_date"], errors="coerce").dt.date
-
+    accounts = get_accounts()
     categories = get_categories()
     category_map = dict(zip(categories["category_name"], categories["category_id"]))
 
-    tab1, tab2, tab3 = st.tabs(["Transactions", "Summary", "Categories"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Transactions", "Summary", "Categories", "Import CSV"])
     with tab1:
         
         filtered_df = st.session_state.original_df.copy()
@@ -91,7 +94,7 @@ def main():
         category_search = col3.selectbox("Select Category", category_list)
 
         if category_search:
-            filtered_df = filtered_df[filtered_df["category_name"].str.contains(category_search)]
+            filtered_df = filtered_df[filtered_df["category_name"].str.contains(category_search, na=False)]
 
         date_search_start, date_search_end = col4.date_input(
             "Select Dates",
@@ -184,6 +187,11 @@ def main():
 
         filtered_summary_df
 
+        fig = px.line(filtered_summary_df, x='year_month', y='total')
+
+        st.plotly_chart(fig)
+
+
         #summary_df = month_summary()
     
         #summary_df['year_month'] = pd.to_datetime(summary_df['year_month'])
@@ -206,6 +214,24 @@ def main():
         is_visable = col2.selectbox("Should the category be visable", ["True", "False"])
         col2.button("Submit", on_click=submit_category, args=(new_category, new_parent_category, is_visable))
 
+    with tab4:
+        dataframe = None
+        col1, col2 = st.columns(2)
+
+        uploaded_file = col1.file_uploader("Choose a file", type="csv")
+        
+        selected_account = col2.selectbox("choose account", accounts["account_name"])
+        account_id = int(accounts.loc[accounts['account_name'] == selected_account, 'account_id'].iloc[0])
+
+
+
+        if uploaded_file is not None:
+            dataframe = pd.read_csv(uploaded_file, skiprows=1)
+            st.write(dataframe)
+            st.button(label="Submit", key="import_csv_button", type="primary", on_click=submit_CSV_import, args=(dataframe, account_id))
+
+        
+        
 
 if __name__ == "__main__":
     main()

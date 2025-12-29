@@ -16,7 +16,6 @@ def get_transactions():
     ON t.transaction_type_id = tt.transaction_type_id
     LEFT JOIN categories as c
     ON s.category_id = c.category_id
-    WHERE c.is_visable = 'True'
     ORDER BY t.transaction_date
     """
 
@@ -70,6 +69,14 @@ def get_categories():
 
     query = "SELECT * FROM categories ORDER BY category_name ASC"
     
+    return pd.read_sql_query(query, connection)
+
+def get_accounts():
+    connection = sqlite3.connect(DATABASE)
+    cursor = connection.cursor()
+
+    query = "SELECT * FROM accounts"
+
     return pd.read_sql_query(query, connection)
 
 def add_category(category_name, parent_category, is_visable):
@@ -170,8 +177,8 @@ def categorize_transactions(db):
     connection.close()
 
 
-def sync_transactions(db):
-    connection = sqlite3.connect(db)
+def sync_transactions():
+    connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
     
     query = "SELECT t.transaction_id, t.amount FROM transactions AS t LEFT JOIN transaction_split AS s ON t.transaction_id = s.transaction_id WHERE s.split_id IS NULL"
@@ -184,21 +191,21 @@ def sync_transactions(db):
     connection.close()
 
 
-def import_file_to_db(file, db):
-    connection = sqlite3.connect(db)
+def import_file_to_db(df, account_id):
+    connection = sqlite3.connect(DATABASE)
 
     cursor = connection.cursor()
-    cursor.execute("SELECT * FROM accounts")
+    #cursor.execute("SELECT * FROM accounts")
 
-    accounts = cursor.fetchall()
+    #accounts = cursor.fetchall()
     
-    print("Select an option:")
+    #print("Select an option:")
 
-    for account in accounts:
-        print(f"{account[0]}: {account[1]}")
-    account_id = int(input("Your Choice: "))
+    #for account in accounts:
+    #    print(f"{account[0]}: {account[1]}")
+    #account_id = int(input("Your Choice: "))
 
-    df = pd.read_csv(file, skiprows = 1)
+    #df = pd.read_csv(file, skiprows = 1)
 
     df.columns = [col.strip() for col in df.columns]
     df["Amount"] = df["Amount"] .str.replace(",", "").astype(float)
@@ -215,8 +222,8 @@ def import_file_to_db(file, db):
         
         data.append((row['Date'].strftime('%Y-%m-%d'), row['Description'], abs(row['Amount']), transaction_type_id, account_id))
 
-    for line in data:
-        print(line)
+    #for line in data:
+    #    print(line)
 
     cursor.executemany("INSERT into transactions (transaction_date, description, amount, transaction_type_id, account_id) VALUES (?, ?, ?, ?, ?)", data)
     connection.commit()
