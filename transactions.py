@@ -1,0 +1,135 @@
+import streamlit as st
+import pandas as pd
+import datetime
+from backend import *
+from frontend_functions import *
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+st.set_page_config(page_title="Transactions", layout="wide")
+
+st.title("Transactions")
+sync_transactions()
+
+initialize_session_state()
+
+#df = get_transactions()
+
+#df["transaction_date"] = pd.to_datetime(df["transaction_date"], errors="coerce").dt.date
+accounts = get_accounts()
+#categories = get_categories()
+category_map = dict(zip(st.session_state.categories["category_name"], st.session_state.categories["category_id"]))
+
+filtered_df = st.session_state.original_df.copy()
+
+#category_list = categories["category_name"].tolist()
+
+#category_list.insert(0, "")
+
+col1, col2, col3, col4 = st.columns(4)
+#search for descriptions
+description_search = col1.text_input(
+    label="Search for transaction desctription",
+    placeholder="Search",
+    key="search_input"
+)
+
+if description_search:
+    search_term = description_search.lower()
+
+    filtered_df = filtered_df[filtered_df['description'].str.lower().str.contains(search_term, na=False)]
+#else:
+    
+    #filtered_df = df.copy()
+
+#search for transaction type
+transaction_type_search = col2.selectbox("Select Transaction Type", ("", "Income", "Expense"))
+
+if transaction_type_search:
+    filtered_df = filtered_df[filtered_df["transaction_type_name"].str.contains(transaction_type_search)]
+
+#search for categories
+category_search = col3.selectbox("Select Category", st.session_state.category_list)
+
+if category_search:
+    filtered_df = filtered_df[filtered_df["category_name"].str.contains(category_search, na=False)]
+
+date_search_start, date_search_end = col4.date_input(
+    "Select Dates",
+    (datetime.date(2024, 1, 1), datetime.date.today()),
+    datetime.date(2024, 1, 1), datetime.date.today(),
+    format="MM/DD/YYYY"
+)
+if date_search_start and date_search_end:
+    filtered_df = filtered_df[filtered_df['transaction_date'].between(date_search_start, date_search_end)]
+
+st.session_state.edited_df = st.data_editor(
+    filtered_df,
+    key=f"data_editor_{st.session_state.editor_key}",
+    column_order=["description", "transaction_date", "amount", "transaction_type_name", "category_name"],
+    column_config={
+        "description": "Description",
+        "transaction_date": st.column_config.DateColumn(
+            "Transaction Date",
+            format="MM/DD/YYYY",
+        ), 
+        "amount": st.column_config.NumberColumn(
+            "Amount",
+            format="dollar",
+        ),
+        "transaction_type_name": "Transaction Type",
+        "category_name": st.column_config.SelectboxColumn(
+            "Category",
+            options=st.session_state.category_list
+        )
+    },
+    hide_index=True
+)
+
+
+editor_state = st.session_state.get(f"data_editor_{st.session_state.editor_key}", {})
+
+edited_rows = editor_state.get("edited_rows", {})
+
+changed_list = []
+for row_idx, changes in edited_rows.items():
+    split_id = int(st.session_state.edited_df.iloc[row_idx]["split_id"])
+    description = st.session_state.edited_df.iloc[row_idx]["description"]
+
+    if "category_name" in changes:
+        new_category_name = changes["category_name"]
+        new_category_id = category_map[new_category_name] 
+
+        changed_list.append({
+            "split_id": split_id,
+            "description": description,
+            "new_category_name": new_category_name,
+            "new_category_id": new_category_id
+        })
+
+
+
+update_list = []
+changed_df = pd.DataFrame(changed_list)
+if not changed_df.empty:
+    
+    for i in changed_list:
+        update_list.append((i["new_category_id"], int(i["split_id"])))
+    
+    flex = st.container(horizontal=True, horizontal_alignment="right")
+
+    flex.button('Reset', on_click=reset_dataframe, type="primary")
+    flex.button('Submit', on_click=submit_changes, args=[update_list])
+
+
+    st.dataframe(changed_df,
+                column_order=["description", "new_category_name"],
+                column_config={
+                 "description": "Description",
+                 "new_category_name": "New Category"
+
+                 },
+                hide_index=True)
+
+
