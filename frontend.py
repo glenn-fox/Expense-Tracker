@@ -1,19 +1,22 @@
 import streamlit as st
-import pandas as pd
-import datetime
-from backend import *
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+# from backend import *
+# import plotly.graph_objects as go
+# from plotly.subplots import make_subplots
 
 
 def main():
 
-    pg = st.navigation(["transactions.py", "summary.py", "categories.py", "import_csv.py"])
+    pg = st.navigation(
+        [
+            st.Page("transactions.py", title="Tansactions"),
+            st.Page("summary.py", title="Summary"),
+            st.Page("categories.py", title="Categories"),
+            st.Page("import_csv.py", title="Import CSV"),
+            st.Page("transaction_rules.py", title="Transaction Rules"),
+        ]
+    )
     pg.run()
 
-        
-        
 
 if __name__ == "__main__":
     main()

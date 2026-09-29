@@ -32,6 +32,9 @@ def initialize_session_state():
     if 'accounts' not in st.session_state:
         st.session_state.accounts = get_accounts()
 
+    if 'transaction_types' not in st.session_state:
+        st.session_state.transaction_types = get_transaction_types()
+
 def reset_dataframe():
     st.session_state.current_df = st.session_state.original_df.copy()
     st.session_state.editor_key += 1

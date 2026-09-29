@@ -1,12 +1,13 @@
 import sqlite3
 import pandas as pd
-import csv
+# import csv
 
 DATABASE = "budget_db"
 
+
 def get_transactions():
     connection = sqlite3.connect(DATABASE)
-    cursor = connection.cursor()
+    # cursor = connection.cursor()
 
     query = """SELECT s.split_id, description, t.transaction_date, t.amount, tt.transaction_type_name, c.category_name FROM
     transaction_split AS s
@@ -23,6 +24,88 @@ def get_transactions():
     connection.close()
     return df
 
+
+def add_transaction_rule(description, category_id, transaction_type_id):
+    connection = sqlite3.connect(DATABASE)
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "SELECT * FROM transaction_rules WHERE rule_text = ?", (description,)
+    )
+
+    query = "INSERT INTO  transaction_rules (rule_text, category_id, transaction_type_id) VALUES (?, ?, ?)"
+
+    try:
+        if cursor.fetchone() is None:
+            cursor.execute(
+                query,
+                (
+                    description,
+                    category_id,
+                    transaction_type_id,
+                ),
+            )
+            connection.commit()
+            connection.close()
+            return "adding rule to database"
+
+    except Exception as e:
+        connection.close()
+        return e
+
+    # def get_transaction_rules():
+    # connection = sqlite3.connect(DATABASE)
+    # cursor = connection.cursor()
+
+    # query = """SELECT rule_text, category_name, transaction_type_name FROM transaction_rules as tr
+    #    LEFT JOIN categories as c on tr.category_id = c.category_id
+    #    LEFT JOIN transaction_type as tt ON tt.transaction_type_id = tr.transaction_type_id """
+
+    # df = pd.read_sql_query(query, connection)
+    # connection.close()
+    # return df
+
+
+def get_transaction_types():
+    connection = sqlite3.connect(DATABASE)
+    # cursor = connection.cursor()
+
+    query = """SELECT * FROM transaction_type"""
+
+    df = pd.read_sql_query(query, connection)
+    connection.close()
+    return df
+
+
+def run_transaction_rules():
+    connection = sqlite3.connect(DATABASE)
+    cursor = connection.cursor()
+
+    query = """UPDATE transaction_split
+            SET category_id = r.category_id
+            FROM transactions t, transaction_rules r
+            WHERE transaction_split.transaction_id = t.transaction_id
+            AND t.description LIKE '%' || r.rule_text || '%'
+            AND transaction_split.category_id IS NULL"""
+
+    cursor.execute(query)
+
+    connection.commit()
+    connection.close()
+    return "ran transaction rules"
+
+
+def get_transaction_rules():
+    connection = sqlite3.connect(DATABASE)
+    # cursor = connection.cursor()
+
+    query = "SELECT * FROM transaction_rules"
+
+    df = pd.read_sql_query(query, connection)
+    connection.close()
+    return df
+
+
 def get_monthly_category_summary():
     connection = sqlite3.connect(DATABASE)
 
@@ -31,8 +114,7 @@ def get_monthly_category_summary():
         LEFT JOIN transaction_split AS ts
         ON c.category_id = ts.category_id
         LEFT JOIN transactions as t
-        ON ts.transaction_id = t.transaction_id
-        WHERE c.is_visable = 'True'
+        ON ts.transaction_id = t.transaction_id WHERE c.is_visable = 'True'
         GROUP BY c.category_id, c.category_name, year_month
         ORDER BY year_month
         """
@@ -65,30 +147,39 @@ def month_summary():
 
 def get_categories():
     connection = sqlite3.connect(DATABASE)
-    cursor = connection.cursor()
+    # cursor = connection.cursor()
 
     query = "SELECT * FROM categories ORDER BY category_name ASC"
-    
+
     return pd.read_sql_query(query, connection)
+
 
 def get_accounts():
     connection = sqlite3.connect(DATABASE)
-    cursor = connection.cursor()
+    # cursor = connection.cursor()
 
     query = "SELECT * FROM accounts"
 
     return pd.read_sql_query(query, connection)
+
 
 def add_category(category_name, parent_category, is_visable):
     connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
 
     cursor.execute("SELECT * FROM categories WHERE category_name = ?", (category_name,))
-    
-    #print(cursor.fetchone())
+
+    # print(cursor.fetchone())
     try:
         if cursor.fetchone() is None:
-            cursor.execute("INSERT INTO categories (category_name, parent_category_id, is_visable) VALUES (?, ?, ?)", (category_name, parent_category, is_visable,))
+            cursor.execute(
+                "INSERT INTO categories (category_name, parent_category_id, is_visable) VALUES (?, ?, ?)",
+                (
+                    category_name,
+                    parent_category,
+                    is_visable,
+                ),
+            )
             connection.commit()
             connection.close()
             return "Added Category Successfully"
@@ -97,7 +188,7 @@ def add_category(category_name, parent_category, is_visable):
     except Exception as e:
         return e
 
-    
+
 def update_categories(change_list):
     connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
@@ -110,7 +201,6 @@ def update_categories(change_list):
             WHERE split_id = ?
         """
     try:
-
         cursor.executemany(query, change_list)
 
         connection.commit()
@@ -120,10 +210,11 @@ def update_categories(change_list):
     except sqlite3.Error as e:
         result = f"A database error occured: {e}"
         connection.rollback()
-    
+
     finally:
         connection.close()
         return result
+
 
 def categorize_transactions(db):
     user_in = ""
@@ -140,7 +231,7 @@ def categorize_transactions(db):
         ON s.transaction_id = t.transaction_id WHERE s.category_id IS NULL
         AND t.description LIKE ?
         ORDER BY t.transaction_date ASC"""
-    
+
     while True:
         user_in = input("What would you like to search for?: ")
         user_in = "%" + user_in + "%"
@@ -148,44 +239,48 @@ def categorize_transactions(db):
         cursor.execute(query, (user_in,))
 
         results = cursor.fetchall()
-    
+
         for result in results:
             print(result)
-        if input("Do you want to update the category on these transactions? y/N ").upper() == "Y":
+        if (
+            input(
+                "Do you want to update the category on these transactions? y/N "
+            ).upper()
+            == "Y"
+        ):
             break
-
 
     for category in categories:
         print(category)
 
     user_in = int(input("please select a category id to assign to the transactions: "))
 
-
     ids = []
     for i in results:
         ids.append((user_in, i[0]))
-    
 
-        
-    #print(ids)
+    # print(ids)
 
     query = """Update transaction_split SET category_id = ? WHERE split_id = ?"""
-    #query = f"SELECT * FROM transaction_split WHERE split_id IN {ids}"
+    # query = f"SELECT * FROM transaction_split WHERE split_id IN {ids}"
     cursor.executemany(query, ids)
     connection.commit()
-    #print(query)
+    # print(query)
     connection.close()
 
 
 def sync_transactions():
     connection = sqlite3.connect(DATABASE)
     cursor = connection.cursor()
-    
+
     query = "SELECT t.transaction_id, t.amount FROM transactions AS t LEFT JOIN transaction_split AS s ON t.transaction_id = s.transaction_id WHERE s.split_id IS NULL"
     cursor.execute(query)
     transactions = cursor.fetchall()
 
-    cursor.executemany("INSERT into transaction_split (transaction_id, amount) VALUES (?, ?)", transactions)
+    cursor.executemany(
+        "INSERT into transaction_split (transaction_id, amount) VALUES (?, ?)",
+        transactions,
+    )
 
     connection.commit()
     connection.close()
@@ -195,37 +290,49 @@ def import_file_to_db(df, account_id):
     connection = sqlite3.connect(DATABASE)
 
     cursor = connection.cursor()
-    #cursor.execute("SELECT * FROM accounts")
+    # cursor.execute("SELECT * FROM accounts")
 
-    #accounts = cursor.fetchall()
-    
-    #print("Select an option:")
+    # accounts = cursor.fetchall()
 
-    #for account in accounts:
+    # print("Select an option:")
+
+    # for account in accounts:
     #    print(f"{account[0]}: {account[1]}")
-    #account_id = int(input("Your Choice: "))
+    # account_id = int(input("Your Choice: "))
 
-    #df = pd.read_csv(file, skiprows = 1)
+    # df = pd.read_csv(file, skiprows = 1)
 
     df.columns = [col.strip() for col in df.columns]
-    df["Amount"] = df["Amount"] .str.replace(",", "").astype(float)
-    df["Date"] = pd.to_datetime(df["Date"], format='%m/%d/%Y').dt.date
-
+    df["Amount"] = df["Amount"].str.replace(",", "").astype(float)
+    df["Date"] = pd.to_datetime(df["Date"], format="%m/%d/%Y").dt.date
 
     data = []
     for index, row in df.iterrows():
         transaction_type_id = 0
-        if (row["Amount"] < 0 and account_id == 1) or (row["Amount"] > 0 and account_id == 2): #account_id 1 == checking
-            transaction_type_id = 2 # transaction_type_id 2 == expense, 1 == income
+        if (row["Amount"] < 0 and account_id == 1) or (
+            row["Amount"] > 0 and account_id == 2
+        ):  # account_id 1 == checking
+            transaction_type_id = 2  # transaction_type_id 2 == expense, 1 == income
         else:
             transaction_type_id = 1
-        
-        data.append((row['Date'].strftime('%Y-%m-%d'), row['Description'], abs(row['Amount']), transaction_type_id, account_id))
 
-    #for line in data:
+        data.append(
+            (
+                row["Date"].strftime("%Y-%m-%d"),
+                row["Description"],
+                abs(row["Amount"]),
+                transaction_type_id,
+                account_id,
+            )
+        )
+
+    # for line in data:
     #    print(line)
 
-    cursor.executemany("INSERT into transactions (transaction_date, description, amount, transaction_type_id, account_id) VALUES (?, ?, ?, ?, ?)", data)
+    cursor.executemany(
+        "INSERT into transactions (transaction_date, description, amount, transaction_type_id, account_id) VALUES (?, ?, ?, ?, ?)",
+        data,
+    )
     connection.commit()
 
     connection.close()
@@ -236,42 +343,37 @@ def menu():
     database = "budget_db"
 
     while choice.upper() != "Q":
-
         print("choose option:")
         print("1: view categories")
         print("2: categorize transactions")
         choice = input("your choice: ")
 
-
         if choice == "1":
-            get_categories(database)
+            get_categories()
         if choice == "2":
             categorize_transactions(database)
         if choice == "3":
             connection = sqlite3.connect(database)
-            cursor = connection.cursor()
+            # cursor = connection.cursor()
             df = pd.read_sql_query("Select * FROM transactions", connection)
 
             print(df)
 
 
-
 if __name__ == "__main__":
     print("hello")
     database = "budget_db"
-    
-    sync_transactions(database)
-    
-    #get_categories(database)
-    #categorize_transactions(database)
-    
+
+    sync_transactions()
+
+    # get_categories(database)
+    # categorize_transactions(database)
 
     menu()
 
+    # import_file_to_db(file, database)
 
-    #import_file_to_db(file, database)
-
-    #print(df)
+    # print(df)
 
     # data = []
     # for i, row in df.iterrows():
@@ -286,4 +388,3 @@ if __name__ == "__main__":
     #
     #
     # connection.commit()
-
